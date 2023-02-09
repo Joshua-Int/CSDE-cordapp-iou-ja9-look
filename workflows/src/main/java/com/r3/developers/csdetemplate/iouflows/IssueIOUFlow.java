@@ -1,8 +1,11 @@
-package com.r3.developers.csdetemplate.utxoexample.workflows;
+package com.r3.developers.csdetemplate.iouflows;
 
-import com.r3.developers.csdetemplate.utxoexample.contracts.ChatContract;
-import com.r3.developers.csdetemplate.utxoexample.states.ChatState;
-import net.corda.v5.application.flows.*;
+import com.r3.developers.csdetemplate.utxoexample.contracts.IOUContract;
+import com.r3.developers.csdetemplate.utxoexample.states.IOUState;
+import net.corda.v5.application.flows.CordaInject;
+import net.corda.v5.application.flows.FlowEngine;
+import net.corda.v5.application.flows.RPCRequestData;
+import net.corda.v5.application.flows.RPCStartableFlow;
 import net.corda.v5.application.marshalling.JsonMarshallingService;
 import net.corda.v5.application.membership.MemberLookup;
 import net.corda.v5.base.annotations.Suspendable;
@@ -25,12 +28,12 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.UUID;
 
-import static java.util.Objects.*;
+import static java.util.Objects.requireNonNull;
 
 // See Chat CorDapp Design section of the getting started docs for a description of this flow.
-public class CreateNewChatFlow implements RPCStartableFlow {
+public class IssueIOUFlow implements RPCStartableFlow {
 
-    private final static Logger log = LoggerFactory.getLogger(CreateNewChatFlow.class);
+    private final static Logger log = LoggerFactory.getLogger(IssueIOUFlow.class);
 
     @CordaInject
     public JsonMarshallingService jsonMarshallingService;
@@ -54,26 +57,26 @@ public class CreateNewChatFlow implements RPCStartableFlow {
     @Override
     public String call( RPCRequestData requestBody) {
 
-        log.info("CreateNewChatFlow.call() called");
+        log.info("IssueIOUFlow.call() called");
 
         try {
             // Obtain the deserialized input arguments to the flow from the requestBody.
-            CreateNewChatFlowArgs flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, CreateNewChatFlowArgs.class);
+            IssueIOUFlowArgs flowArgs = requestBody.getRequestBodyAs(jsonMarshallingService, IssueIOUFlowArgs.class);
 
-            // Get MemberInfos for the Vnode running the flow and the otherMember.
+            // Get MemberInfos for the Vnode running the flow and the lender.
             MemberInfo myInfo = memberLookup.myInfo();
-            MemberInfo otherMember = requireNonNull(
-                    memberLookup.lookup(MemberX500Name.parse(flowArgs.getOtherMember())),
-                    "MemberLookup can't find otherMember specified in flow arguments."
+            MemberInfo lenderLookup = requireNonNull(
+                    memberLookup.lookup(MemberX500Name.parse(flowArgs.getLender())),
+                    "MemberLookup can't find the lender specified in flow arguments."
             );
 
-            // Create the ChatState from the input arguments and member information.
-            ChatState chatState = new ChatState(
+            // Create the IOUState from the input arguments and member information.
+            IOUState iouState = new IOUState(
                     UUID.randomUUID(),
-                    flowArgs.getChatName(),
+                    lenderLookup.getName(),
                     myInfo.getName(),
-                    flowArgs.getMessage(),
-                    Arrays.asList(myInfo.getLedgerKeys().get(0), otherMember.getLedgerKeys().get(0))
+                    Integer.parseInt(flowArgs.getAmount()),
+                    Arrays.asList(myInfo.getLedgerKeys().get(0), lenderLookup.getLedgerKeys().get(0))
             );
 
             // Obtain the Notary name and public key.
@@ -97,9 +100,9 @@ public class CreateNewChatFlow implements RPCStartableFlow {
             UtxoTransactionBuilder txBuilder = ledgerService.getTransactionBuilder()
                     .setNotary(new Party(notary.getName(), notaryKey))
                     .setTimeWindowBetween(Instant.now(), Instant.now().plusMillis(Duration.ofDays(1).toMillis()))
-                    .addOutputState(chatState)
-                    .addCommand(new ChatContract.Create())
-                    .addSignatories(chatState.getParticipants());
+                    .addOutputState(iouState)
+                    .addCommand(new IOUContract.Issue())
+                    .addSignatories(iouState.getParticipants());
 
             // Convert the transaction builder to a UTXOSignedTransaction and sign with this Vnode's first Ledger key.
             // Note, toSignedTransaction() is currently a placeholder method, hence being marked as deprecated.
@@ -109,7 +112,7 @@ public class CreateNewChatFlow implements RPCStartableFlow {
             // Call FinalizeChatSubFlow which will finalise the transaction.
             // If successful the flow will return a String of the created transaction id,
             // if not successful it will return an error message.
-            return flowEngine.subFlow(new FinalizeChatSubFlow(signedTransaction, otherMember.getName()));
+            return flowEngine.subFlow(new FinalizeIOUFlow(signedTransaction, lenderLookup.getName()));
         }
         // Catch any exceptions, log them and rethrow the exception.
         catch (Exception e) {

@@ -1,6 +1,8 @@
-package com.r3.developers.csdetemplate.utxoexample.workflows;
+package com.r3.developers.csdetemplate.iouflows;
 
-import net.corda.v5.application.flows.*;
+import net.corda.v5.application.flows.CordaInject;
+import net.corda.v5.application.flows.InitiatingFlow;
+import net.corda.v5.application.flows.SubFlow;
 import net.corda.v5.application.messaging.FlowMessaging;
 import net.corda.v5.application.messaging.FlowSession;
 import net.corda.v5.base.annotations.Suspendable;
@@ -16,14 +18,14 @@ import java.util.List;
 // See Chat CorDapp Design section of the getting started docs for a description of this flow.
 
 // @InitiatingFlow declares the protocol which will be used to link the initiator to the responder.
-@InitiatingFlow(protocol = "finalize-chat-protocol")
-public class FinalizeChatSubFlow implements SubFlow<String> {
+@InitiatingFlow(protocol = "finalize-iou-protocol")
+public class FinalizeIOUFlow implements SubFlow<String> {
 
-    private final static Logger log = LoggerFactory.getLogger(FinalizeChatSubFlow.class);
+    private final static Logger log = LoggerFactory.getLogger(FinalizeIOUFlow.class);
     private final UtxoSignedTransaction signedTransaction;
     private final MemberX500Name otherMember;
 
-    public FinalizeChatSubFlow(UtxoSignedTransaction signedTransaction, MemberX500Name otherMember) {
+    public FinalizeIOUFlow(UtxoSignedTransaction signedTransaction, MemberX500Name otherMember) {
         this.signedTransaction = signedTransaction;
         this.otherMember = otherMember;
     }
@@ -39,7 +41,7 @@ public class FinalizeChatSubFlow implements SubFlow<String> {
     @Suspendable
     public String call() {
 
-        log.info("FinalizeChatFlow.call() called");
+        log.info("FinalizeIOUFlow.call() called");
 
         // Initiates a session with the other Member.
         FlowSession session = flowMessaging.initiateFlow(otherMember);

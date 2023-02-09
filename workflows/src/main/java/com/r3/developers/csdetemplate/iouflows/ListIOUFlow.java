@@ -1,6 +1,6 @@
-package com.r3.developers.csdetemplate.utxoexample.workflows;
+package com.r3.developers.csdetemplate.iouflows;
 
-import com.r3.developers.csdetemplate.utxoexample.states.ChatState;
+import com.r3.developers.csdetemplate.utxoexample.states.IOUState;
 import net.corda.v5.application.flows.CordaInject;
 import net.corda.v5.application.flows.RPCRequestData;
 import net.corda.v5.application.flows.RPCStartableFlow;
@@ -11,13 +11,13 @@ import net.corda.v5.ledger.utxo.UtxoLedgerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 // See Chat CorDapp Design section of the getting started docs for a description of this flow.
-public class ListChatsFlow implements RPCStartableFlow{
+public class ListIOUFlow implements RPCStartableFlow {
 
-    private final static Logger log = LoggerFactory.getLogger(ListChatsFlow.class);
+    private final static Logger log = LoggerFactory.getLogger(ListIOUFlow.class);
 
     @CordaInject
     public JsonMarshallingService jsonMarshallingService;
@@ -30,17 +30,18 @@ public class ListChatsFlow implements RPCStartableFlow{
     @Override
     public String call(RPCRequestData requestBody) {
 
-        log.info("ListChatsFlow.call() called");
+        log.info("ListIOUFlow.call() called");
 
         // Queries the VNode's vault for unconsumed states and converts the result to a serializable DTO.
-        List<StateAndRef<ChatState>> states = utxoLedgerService.findUnconsumedStatesByType(ChatState.class);
-        List<ChatStateResults> results = states.stream().map( stateAndRef ->
-            new ChatStateResults(
-                    stateAndRef.getState().getContractState().getId(),
-                    stateAndRef.getState().getContractState().getChatName(),
-                    stateAndRef.getState().getContractState().getMessageFrom().toString(),
-                    stateAndRef.getState().getContractState().getMessage()
-                    )
+        List<StateAndRef<IOUState>> states = utxoLedgerService.findUnconsumedStatesByType(IOUState.class);
+        List<ListIOUFlowArgs> results = states.stream().map(stateAndRef ->
+                new ListIOUFlowArgs(
+                        stateAndRef.getState().getContractState().getId(),
+                        stateAndRef.getState().getContractState().getLender().toString(),
+                        stateAndRef.getState().getContractState().getBorrower().toString(),
+                        stateAndRef.getState().getContractState().getAmount(),
+                        stateAndRef.getState().getContractState().getAmountPaid()
+                )
         ).collect(Collectors.toList());
 
         // Uses the JsonMarshallingService's format() function to serialize the DTO to Json.
